@@ -1,0 +1,14 @@
+name: predictive_maintenance
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pandas
+  - numpy
+  - matplotlib
+  - seaborn
+  - scikit-learn
+  - pydotplus
+  - graphviz
+  - ipython
