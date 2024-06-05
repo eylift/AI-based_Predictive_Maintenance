@@ -1,0 +1,294 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Analyse und Visualisierung eines Entscheidungsbaums für Predictive Maintenance\n",
+    "In diesem Notebook werden wir einen Entscheidungsbaum aus einem Random Forest-Modell für die vorausschauende Wartung (Predictive Maintenance) visualisieren und interpretieren. Wir verwenden einen Datensatz eines Industrieroboters, der verschiedene Sensorwerte und Betriebsdaten enthält."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "748034ba"
+   },
+   "source": [
+    "# Analyse und Visualisierung eines Entscheidungsbaums für Predictive Maintenance\n",
+    "In diesem Notebook werden wir einen Entscheidungsbaum aus einem Random Forest-Modell für die vorausschauende Wartung (Predictive Maintenance) visualisieren und interpretieren. Wir verwenden einen Datensatz eines Industrieroboters, der verschiedene Sensorwerte und Betriebsdaten enthält."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "d32f4ba4"
+   },
+   "source": [
+    "## 1. Importieren der notwendigen Bibliotheken\n",
+    "Zunächst importieren wir die notwendigen Bibliotheken für Datenanalyse, Visualisierung und maschinelles Lernen."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {
+    "id": "3e9382bb"
+   },
+   "outputs": [],
+   "source": [
+    "import os\n",
+    "import pandas as pd\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import seaborn as sns\n",
+    "from sklearn.model_selection import train_test_split\n",
+    "from sklearn.ensemble import RandomForestClassifier\n",
+    "from sklearn.metrics import accuracy_score, confusion_matrix, classification_report\n",
+    "from sklearn.tree import export_graphviz\n",
+    "import pydotplus\n",
+    "from IPython.display import Image, display"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "810dd378"
+   },
+   "source": [
+    "## 2. Laden und Überprüfen der Daten\n",
+    "Wir laden den Datensatz und überprüfen die ersten Zeilen sowie einige grundlegende Statistiken und mögliche fehlende Werte."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {
+    "colab": {
+     "base_uri": "https://localhost:8080/"
+    },
+    "id": "c34f5e08",
+    "outputId": "91a6f7b6-6448-4c6d-e0a3-32420a5c13a0"
+   },
+   "outputs": [
+    {
+     "output_type": "stream",
+     "name": "stdout",
+     "text": [
+      "   stromverbrauch_kwh  motorlast_prozent  temperatur_celsius  druck_bar  \\\n",
+      "0           10.496714          78.577874           52.027862   5.378494   \n",
+      "1            9.861736          80.607845           55.635759   5.611676   \n",
+      "2           10.647689          85.830512           55.727915   5.272456   \n",
+      "3           11.523030          81.049843           49.627634   4.811256   \n",
+      "4            9.765847          86.540421           46.799438   5.550797   \n",
+      "\n",
+      "   vibrations_m_s2  feuchtigkeit_prozent  wartung  \n",
+      "0         0.613669              47.945638        0  \n",
+      "1         0.594376              50.728640        0  \n",
+      "2         0.621234              47.280005        1  \n",
+      "3         0.646846              51.049652        0  \n",
+      "4         0.562798              48.945396        1  \n"
+     ]
+    }
+   ],
+   "source": [
+    "data = pd.read_csv('https://raw.githubusercontent.com/eylift/AI-based_Predictive_Maintenance/main/industrieroboter_wartung_data.csv')  # Raw GitHub path to the dataset\n",
+    "display(data.head())  # Anzeige der ersten Zeilen des Datensatzes\n",
+    "display(data.describe())  # Grundlegende statistische Zusammenfassung\n",
+    "display(data.isnull().sum())  # Überprüfung auf fehlende Werte"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "b2f7cfe1"
+   },
+   "source": [
+    "## 3. Datenvorbereitung und Aufteilung\n",
+    "In diesem Schritt bereiten wir die Daten für das Training des Modells vor. Wir teilen den Datensatz in Merkmale (X) und Zielvariable (y) auf. Anschließend teilen wir die Daten in Trainings- und Testsets, um die Leistung des Modells später bewerten zu können."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {
+    "id": "84c4a90d"
+   },
+   "outputs": [],
+   "source": [
+    "# Annahme: Zielvariable ist die letzte Spalte im Datensatz\n",
+    "X = data.iloc[:, :-1]\n",
+    "y = data.iloc[:, -1]\n",
+    "\n",
+    "# Aufteilen der Daten in Trainings- und Testsets\n",
+    "X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "577d1fbb"
+   },
+   "source": [
+    "## 4. Training des Random Forest Modells\n",
+    "In diesem Schritt trainieren wir einen Random Forest Classifier mit den Trainingsdaten. Random Forest ist ein Ensemble-Lernverfahren, das mehrere Entscheidungsbäume kombiniert, um die Vorhersagegenauigkeit zu verbessern und Überanpassung zu vermeiden."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {
+    "id": "be238d30"
+   },
+   "outputs": [],
+   "source": [
+    "# Initialisieren und trainieren des Random Forest Classifiers\n",
+    "rf_model = RandomForestClassifier(n_estimators=100, random_state=42)\n",
+    "rf_model.fit(X_train, y_train)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Evaluierung des Modells mit der Konfusionsmatrix\n",
+    "In diesem Schritt bewerten wir die Leistung des trainierten Modells anhand des Testsets. Wir berechnen die Genauigkeit des Modells und erstellen die Konfusionsmatrix sowie den Klassifikationsbericht. Die Konfusionsmatrix gibt Aufschluss über die Anzahl der korrekt und inkorrekt klassifizierten Beispiele."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Vorhersagen mit dem Testset machen\n",
+    "y_pred = rf_model.predict(X_test)\n",
+    "\n",
+    "# Genauigkeit des Modells berechnen\n",
+    "accuracy = accuracy_score(y_test, y_pred)\n",
+    "print(\"Accuracy:\", accuracy)\n",
+    "\n",
+    "# Konfusionsmatrix erstellen\n",
+    "conf_matrix = confusion_matrix(y_test, y_pred)\n",
+    "print(\"Confusion Matrix:\\n\", conf_matrix)\n",
+    "\n",
+    "# Klassifikationsbericht erstellen\n",
+    "class_report = classification_report(y_test, y_pred)\n",
+    "print(\"Classification Report:\\n\", class_report)\n",
+    "\n",
+    "# Erklärung der Konfusionsmatrix:\n",
+    "# Die Konfusionsmatrix gibt Aufschluss über die Anzahl der korrekt und inkorrekt klassifizierten Beispiele.\n",
+    "# - Die Zeilen stellen die tatsächlichen Klassen dar.\n",
+    "# - Die Spalten stellen die vorhergesagten Klassen dar.\n",
+    "# - Die Diagonalelemente repräsentieren die korrekt klassifizierten Beispiele, während die Nebendiagonalen die falsch klassifizierten Beispiele darstellen.\n",
+    "\n",
+    "# Anwendungskontext:\n",
+    "# Die Konfusionsmatrix hilft uns, die Stärken und Schwächen des Modells zu identifizieren.\n",
+    "# In der vorausschauenden Wartung können wir so besser verstehen, wie gut das Modell Wartungsbedarfe erkennt und wo es möglicherweise zu Fehlklassifikationen kommt."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 6. Analyse der Merkmalswichtigkeit\n",
+    "In diesem Schritt analysieren wir die Wichtigkeit der Merkmale für das Modell. Die Merkmalswichtigkeit gibt an, wie bedeutend jedes Merkmal für die Entscheidungsfindung des Modells ist."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Analyse der Merkmalswichtigkeit\n",
+    "feature_importances = rf_model.feature_importances_\n",
+    "features = X.columns\n",
+    "importance_df = pd.DataFrame({'Feature': features, 'Importance': feature_importances})\n",
+    "importance_df = importance_df.sort_values(by='Importance', ascending=False)\n",
+    "\n",
+    "# Visualisierung der Merkmalswichtigkeit\n",
+    "plt.figure(figsize=(10, 6))\n",
+    "sns.barplot(x='Importance', y='Feature', data=importance_df)\n",
+    "plt.title('Wichtigkeit der Merkmale')\n",
+    "plt.show()\n",
+    "\n",
+    "# Erklärung der Merkmalswichtigkeit:\n",
+    "# Die Merkmalswichtigkeit zeigt, welche Merkmale das Modell am meisten beeinflusst haben.\n",
+    "# Höhere Werte deuten darauf hin, dass das Merkmal wichtiger für die Entscheidungsfindung des Modells war.\n",
+    "\n",
+    "# Anwendungskontext:\n",
+    "# Durch die Analyse der Merkmalswichtigkeit können wir verstehen, welche Faktoren am stärksten zur Vorhersage von Wartungsbedarfen beitragen.\n",
+    "# Dies hilft uns, präventive Wartungsstrategien zu entwickeln und die Effizienz der Anlagen zu verbessern."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 7. Visualisierung des Entscheidungsbaums\n",
+    "In diesem Schritt extrahieren und visualisieren wir einen einzelnen Entscheidungsbaum aus dem trainierten Random Forest Modell. Die Visualisierung hilft uns zu verstehen, wie das Modell Entscheidungen trifft und welche Merkmale dabei eine wichtige Rolle spielen."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Extrahieren eines einzelnen Entscheidungsbaums aus dem Random Forest\n",
+    "estimator = rf_model.estimators_[0]\n",
+    "\n",
+    "# Exportieren des Entscheidungsbaums in das DOT-Format\n",
+    "dot_data = export_graphviz(estimator, out_file=None,\n",
+    "                           feature_names=X.columns,\n",
+    "                           class_names=['No Maintenance', 'Maintenance'],\n",
+    "                           filled=True, rounded=True,\n",
+    "                           special_characters=True)\n",
+    "\n",
+    "# Erstellen eines Graphen aus den DOT-Daten\n",
+    "graph = pydotplus.graph_from_dot_data(dot_data)\n",
+    "\n",
+    "# Speichern des Entscheidungsbaums als PNG-Datei\n",
+    "graph.write_png('decision_tree.png')\n",
+    "\n",
+    "# Anzeigen des gespeicherten Entscheidungsbaums\n",
+    "Image(filename='decision_tree.png')"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "id": "c4e5e5da"
+   },
+   "source": [
+    "## 8. Interpretation des Entscheidungsbaums\n",
+    "Der Entscheidungsbaum ist ein grafisches Modell, das zeigt, wie Entscheidungen basierend auf den Eingabedaten getroffen werden. Jeder Knoten stellt eine Entscheidung basierend auf einem Merkmal und einem Schwellenwert dar, die zu zwei oder mehr Verzweigungen führt. Die Blätter am Ende der Zweige repräsentieren die endgültigen Entscheidungen oder Klassifizierungen.\n",
+    "\n",
+    "- **Merkmal und Schwellenwert**: Jeder Knoten zeigt das Merkmal und den Schwellenwert, der verwendet wird, um die Daten zu teilen.\n",
+    "- **Gini-Index**: Ein Maß für die Unreinheit oder Unordnung des Knotens. Ein niedrigerer Wert bedeutet eine reinere Teilung.\n",
+    "- **Anzahl der Beispiele**: Die Anzahl der Datenpunkte, die zu diesem Knoten gehören.\n",
+    "- **Verteilung der Klassen**: Die Anzahl der Datenpunkte in den verschiedenen Klassen.\n",
+    "- **Vorhersage**: Die häufigste Klasse, die als Vorhersage verwendet wird.\n",
+    "\n",
+    "Durch das Verständnis der Struktur und der Entscheidungen des Entscheidungsbaums können wir die Entscheidungsfindung des Modells besser interpretieren und nachvollziehen.\n",
+    "\n",
+    "# Bedeutung für die Analyse von Maschinendaten zur Instandhaltung industrieller Anlagen:\n",
+    "Diese Methode ermöglicht es uns, die wichtigsten Faktoren zu identifizieren, die zu Wartungsbedarf führen. Sie hilft uns, präventive Maßnahmen zu planen und somit die Zuverlässigkeit und Effizienz der Anlagen zu erhöhen."
+   ]
+  }
+ ],
+ "metadata": {
+  "colab": {
+   "provenance": []
+  },
+  "language_info": {
+   "name": "python"
+  },
+  "kernelspec": {
+   "name": "python3",
+   "display_name": "Python 3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
